@@ -1,5 +1,177 @@
 #!/usr/bin/env bash
 
+get_fields(){
+    # Assign useful field names to parameters
+    domain=$1
+    repoBase=$2
+    repoPath=$3
+    branch=$4
+    id=$5 base=$5
+    compare=$6
+    notation=${7:-..}
+    file=$8
+    start=$9 line=$9
+    end=${10}
+    fields=(
+        domain "$domain"
+        repoBase "$repoBase"
+        repoPath "$repoPath"
+        base "$base"
+        compare "$compare"
+        notation "$notation"
+        file "$file"
+        start "$start"
+        end "$end"
+        )
+    echo "DEBUG:"
+    printf '%s=%s\n' "${fields[@]}"
+    echo "END DEBUG"
+}
+
+get_lines(){
+    # Work out if we're referencing 0, 1, or 2 lines in a file
+    if [[ -n $end ]]; then
+        line=${fileRange}
+    elif [[ -n $line ]]; then
+        line=${fileLine}
+    else
+        line=""
+    fi
+    echo "$line"
+}
+
+get_uri(){
+    # If we're comparing two refs, we don't care about any referenced files, so
+    # short-circuit here
+    if [[ -n $compare ]]; then
+        echo "$url_compare"
+    else
+        if [[ -n $file ]]; then
+            if [[ -n $branch ]]; then
+                echo "$url_fileInBranch"
+            elif [[ -n $id ]]; then
+                echo "$url_fileInCommit"
+            else
+                echo "$url_file"
+            fi
+        else
+            if [[ -n $branch ]]; then
+                echo "$url_branch"
+            elif [[ -n $id ]]; then
+                echo "$url_commit"
+            else
+                echo "$url_repository"
+            fi
+        fi
+    fi
+}
+
+remote_github(){
+    domain=${domain:-github.com}
+    repo=${repoBase}/${repoPath}
+    fileLine=#L${line}
+    fileRange=#L${start}-L${end}
+    line=$(get_lines) # Leave this as is
+    url_repository=https://${domain}/${repo}
+    url_branches=${url_repository}/branches
+    url_branch=${url_repository}/tree/${branch}
+    url_commit=${url_repository}/commit/${id}
+    url_compare=${url_repository}/compare/${base}${notation}${compare}
+    url_fileInBranch=${url_repository}/blob/${branch}/${file}${line}
+    url_fileInCommit=${url_repository}/blob/${id}/${file}${line}
+    url_file="${url_repository}?path=${file}${line}"
+}
+
+remote_gitlab(){
+    domain=${domain:-gitlab.com}
+    repo=${repoBase}/${repoPath}
+    fileLine=#L${line}
+    fileRange=#L${start}-${end}
+    line=$(get_lines) # Leave this as is
+    url_repository=https://${domain}/${repo}
+    url_branches=${url_repository}/-/branches
+    url_branch=${url_repository}/-/tree/${branch}
+    url_commit=${url_repository}/-/commit/${id}
+    url_compare=${url_repository}/-/compare/${base}${notation}${compare}
+    url_fileInBranch=${url_repository}/-/blob/${branch}/${file}${line}
+    url_fileInCommit=${url_repository}/-/blob/${id}/${file}${line}
+    url_file="${url_repository}?path=${file}${line}"
+}
+
+remote_bitbucket(){
+    domain=${domain:-bitbucket.com}
+    repo=${repoBase}/${repoPath}
+    fileLine=#${file}-${line}
+    fileRange=#${file}-${start}:${end}
+    line=$(get_lines) # Leave this as is
+    url_repository=https://${domain}/${repo}
+    url_branches=${url_repository}/branches
+    url_branch=${url_repository}/branch/${branch}
+    url_commit=${url_repository}/commits/${id}
+    url_compare=${url_repository}/${base}%0D${compare}
+    url_compare=${url_compare//%250D/%0D}
+    url_fileInBranch=${url_repository}/src/${branch}/${file}${line}
+    url_fileInCommit=${url_repository}/src/${id}/${file}${line}
+    url_file="${url_repository}?path=${file}${line}"
+}
+
+remote_gitea(){
+    domain=${domain:-gitea.com}
+    repo=${repoBase}/${repoPath}
+    fileLine=#L${line}
+    fileRange=#L${start}-L${end}
+    line=$(get_lines) # Leave this as is
+    url_repository=https://${domain}/${repo}
+    url_branches=${url_repository}/branches
+    url_branch=${url_repository}/src/branch/${branch}
+    url_commit=${url_repository}/commit/${id}
+    url_compare=${url_repository}/compare/${base}...${compare}
+    url_fileInBranch=${url_repository}/src/branch/${branch}/${file}${line}
+    url_fileInCommit=${url_repository}/src/commit/${id}/${file}${line}
+    url_file=${url_repository}/src/${file}${line}
+}
+remote_forgejo(){
+    remote_gitea
+}
+remote_codeberg(){
+    domain=codeberg.org
+    remote_gitea
+}
+
+remote_klaus(){
+    #domain=${domain}
+    repo=${repoBase}/${repoPath}
+    fileLine=#L-${line}
+    fileRange=$fileLine
+    line=$(get_lines) # Leave this as is
+    url_repository=https://${domain}/${repo}
+    url_branches=''
+    url_branch="${url_repository}/${branch}?path="
+    url_commit=${url_repository}/commit/${id}/
+    url_compare=''
+    url_fileInBranch=${url_repository}/blob/${branch}/${file}${line}
+    url_fileInCommit=${url_repository}/blob/${id}/${file}${line}
+    url_file=''
+}
+
+remote_gitit(){
+    #domain=${domain}
+    repo=${repoBase}/${repoPath}
+    fileLine=#L-${line}
+    fileRange=$fileLine
+    line=$(get_lines) # Leave this as is
+    url_repository=https://${domain}/${repo}
+    url_branches=''
+    url_branch=''
+    url_commit=''
+    url_compare="${url_repository}/_diff/${file%.page}?from=${base}&to=${compare}"
+    url_fileInBranch="${url_repository}/${file%.page}?revision=${id}"
+    url_fileInCommit="${url_repository}/${file%.page}?revision=${id}"
+    url_file=${url_repository}/${file%.page}
+}
+
+# ---------------
+
 remote=${1:-""}
 branch=""
 filename=${2:-""}
@@ -7,12 +179,14 @@ line1=${3:-""}
 line2=${4:-""}
 
 # get remote name
-if [[ $remote == "" ]]; then
+if [[ -z $remote ]]; then
     branch="$(git rev-parse --abbrev-ref HEAD 2>/dev/null)"
-    remote=$(git config branch."${branch}".remote || echo "origin")
+    remote=$(git config branch."${branch}".remote ||
+        git remote | grep -w origin ||
+        git remote | head -1)
 fi
 
-if [[ $remote == "" ]]; then
+if [[ -z $remote ]]; then
     echo "Remote not found"
     exit 1
 fi
@@ -20,12 +194,22 @@ fi
 remote_url=$(git remote get-url "$remote") || exit $?
 
 if [[ $remote_url = git@* ]]; then
-    url=$(echo "$remote_url" | sed -E -e 's/:/\//' -e 's/\.git$//' -e 's/.*@(.*)/http:\/\/\1/')
+    url=$(echo "$remote_url" | sed -E -e 's/:/\//' -e 's/\.git$//' -e 's/.*@(.*)/\1/')
+elif [[ $remote_url = ssh://* ]]; then
+    url=$(echo "$remote_url" | sed -E -e 's/ssh:\/\///' -e 's/\.git$//' -e 's/:[[:digit:]]*//' -e 's/.*@(.*)/\1/')
 elif [[ $remote_url = http* ]]; then
     url=${remote_url%.git}
+# FIXME: This regex should say "a colon not followed by two slashes
+elif [[ $remote_url =~ .*:.[^/].* ]]; then
+    url=$(echo "$remote_url" | sed -E -e 's/:/\//' -e 's/\.git$//' -e 's/(.*@)?(.*)/\2/' -e 's://*:/:g')
 fi
+IFS=/ read -r domain repoBase repoPath <<<"${url}"
 
 # construct urls
+# If "HEAD" was the best abbreviated ref we could find, we don't have a branch/tag name
+if [[ $branch = HEAD ]]; then
+    branch=''
+fi
 commit_hash=$(git rev-parse HEAD 2>/dev/null)
 commit_or_branch=${commit_hash:-${branch}}
 
@@ -37,43 +221,54 @@ then
     exit 1
 fi
 
-if [[ $remote_url =~ gitlab ]]; then
-    # construct gitlab urls
-    # https://gitlab.com/<user_or_group>/<repo>/-/blob/<commit_or_branch>/<filename>#L<line1>-<line2>
-    if [[ -n ${filename} ]]; then
-        url="${url}/-/blob/${commit_or_branch}/$(git ls-files --full-name "${filename}")"
-        if [[ -n "${line1}" ]]; then
-            url="${url}#L${line1}"
-            if [[ -n "${line2}" ]]; then
-                url="${url}-${line2}"
-            fi
-        fi
-    fi
-elif [[ $remote_url =~ github ]]; then
-    # construct github urls
-    # https://github.com/<user_or_org>/<repo>/blob/<commit_or_branch>/<filename>#L<line1>-L<line2>
-    if [[ -n "${filename}" ]]; then
-        url="${url}/blob/${commit_or_branch}/$(git ls-files --full-name "${filename}")"
-        if [[ -n "${line1}" ]]; then
-            url="${url}#L${line1}"
-            if [[ -n "${line2}" ]]; then
-                url="${url}-L${line2}"
-            fi
-        fi
-    fi
-elif [[ $remote_url =~ bitbucket ]]; then
-    # construct bitbucket urls
-    # https://bitbucket.org/<user_or_org>/<repo>/src/<commit_or_branch>/<filename>#lines-<line1>:<line2>
-    if [[ -n ${filename} ]]; then
-        url=${url}/src/${commit_or_branch}/$(git ls-files --full-name "${filename}")
-        if [[ -n "${line1}" ]]; then
-            url="${url}#lines-${line1}"
-            if [[ -n "${line2}" ]]; then
-                url="${url}:${line2}"
-            fi
-        fi
-    fi
+# Ensure file path is relative to repo root
+if [[ -n $filename ]]; then
+    filename=$(git ls-files --full-name "${filename}")
 fi
+
+# get_fields domain repoBase repoPath branch base compare notation file start end
+get_fields "$domain" "$repoBase" "$repoPath" "$branch" "$commit_hash" '' '' "$filename" "$line1" "$line2"
+
+if [[ $remote_url =~ gitlab ]]; then
+    remote_gitlab
+elif [[ $remote_url =~ github ]]; then
+    remote_github
+elif [[ $remote_url =~ bitbucket ]]; then
+    remote_bitbucket
+elif [[ $remote_url =~ bitbucket ]]; then
+    remote_bitbucket
+elif [[ $remote_url =~ gitea ]]; then
+    remote_gitea
+elif [[ $remote_url =~ forgejo ]]; then
+    remote_forgejo
+elif [[ $remote_url =~ codeberg ]]; then
+    remote_codeberg
+fi
+
+url=$(get_uri | sed 's://*:/:g')
+
+# If we can't detect one of the major git forges, see if the user has specified
+# a URL pattern we can use to construct a URL
+# For GitHub, for example, a URL pattern could be set using:
+# $ git config --local git-extras.browse-url-pattern "https://github.com/tj/git-extras/blob/{commit_or_branch}/{filename}#L{line1}-L{line2}"
+config_pattern(){
+    git config --local --get git-extras.browse-url-pattern-"$1"
+}
+# remote_custom(){
+#     # domain=${domain}
+#     # repo=${repoBase}/${repoPath}
+#     fileLine=#L-${line}
+#     fileRange=$fileLine
+#     line=$(get_lines) # Leave this as is
+#     url_repository=$(config_pattern url_repository)
+#     url_branches=
+#     url_branch="${url_repository}/${branch}?path="
+#     url_commit=${url_repository}/commit/${id}/
+#     url_compare=""
+#     url_fileInBranch=${url_repository}/blob/${branch}/${file}${line}
+#     url_fileInCommit=${url_repository}/blob/${id}/${file}${line}
+#     url_file=""
+# }
 
 # open url
 case "$OSTYPE" in
