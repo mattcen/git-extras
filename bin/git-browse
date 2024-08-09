@@ -171,17 +171,8 @@ if [[ -n $filename ]]; then
     filename=$(git ls-files --full-name "${filename}")
 fi
 
-#domain=$domain
-#repoBase=$repoBase
-#repoPath=$repoPath
-#branch=$branch
-#commit_hash=$commit_hash commit_hash=$commit_hash
 compare_hash=''
 notation=..
-#filename=$filename
-#line1=$line1
-#line2=$line2
-
 
 if [[ $remote_url =~ gitlab ]]; then
     remote_gitlab
