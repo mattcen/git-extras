@@ -12,20 +12,6 @@ get_fields() {
     file=$8
     start=$9 line=$9
     end=${10}
-    fields=(
-        domain "$domain"
-        repoBase "$repoBase"
-        repoPath "$repoPath"
-        base "$base"
-        compare "$compare"
-        notation "$notation"
-        file "$file"
-        start "$start"
-        end "$end"
-    )
-    echo "DEBUG:"
-    printf '%s=%s\n' "${fields[@]}"
-    echo "END DEBUG"
 }
 
 get_lines() {
