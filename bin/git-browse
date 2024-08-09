@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-get_fields(){
+get_fields() {
     # Assign useful field names to parameters
     domain=$1
     repoBase=$2
@@ -22,13 +22,13 @@ get_fields(){
         file "$file"
         start "$start"
         end "$end"
-        )
+    )
     echo "DEBUG:"
     printf '%s=%s\n' "${fields[@]}"
     echo "END DEBUG"
 }
 
-get_lines(){
+get_lines() {
     # Work out if we're referencing 0, 1, or 2 lines in a file
     if [[ -n $end ]]; then
         line=${fileRange}
@@ -40,7 +40,7 @@ get_lines(){
     echo "$line"
 }
 
-get_uri(){
+get_uri() {
     # If we're comparing two refs, we don't care about any referenced files, so
     # short-circuit here
     if [[ -n $compare ]]; then
@@ -66,7 +66,7 @@ get_uri(){
     fi
 }
 
-remote_github(){
+remote_github() {
     domain=${domain:-github.com}
     repo=${repoBase}/${repoPath}
     fileLine=#L${line}
@@ -82,7 +82,7 @@ remote_github(){
     url_file="${url_repository}?path=${file}${line}"
 }
 
-remote_gitlab(){
+remote_gitlab() {
     domain=${domain:-gitlab.com}
     repo=${repoBase}/${repoPath}
     fileLine=#L${line}
@@ -98,7 +98,7 @@ remote_gitlab(){
     url_file="${url_repository}?path=${file}${line}"
 }
 
-remote_bitbucket(){
+remote_bitbucket() {
     domain=${domain:-bitbucket.com}
     repo=${repoBase}/${repoPath}
     fileLine=#${file}-${line}
@@ -115,7 +115,7 @@ remote_bitbucket(){
     url_file="${url_repository}?path=${file}${line}"
 }
 
-remote_gitea(){
+remote_gitea() {
     domain=${domain:-gitea.com}
     repo=${repoBase}/${repoPath}
     fileLine=#L${line}
@@ -130,15 +130,15 @@ remote_gitea(){
     url_fileInCommit=${url_repository}/src/commit/${id}/${file}${line}
     url_file=${url_repository}/src/${file}${line}
 }
-remote_forgejo(){
+remote_forgejo() {
     remote_gitea
 }
-remote_codeberg(){
+remote_codeberg() {
     domain=codeberg.org
     remote_gitea
 }
 
-remote_klaus(){
+remote_klaus() {
     #domain=${domain}
     repo=${repoBase}/${repoPath}
     fileLine=#L-${line}
@@ -154,7 +154,7 @@ remote_klaus(){
     url_file=''
 }
 
-remote_gitit(){
+remote_gitit() {
     #domain=${domain}
     repo=${repoBase}/${repoPath}
     fileLine=#L-${line}
@@ -215,8 +215,7 @@ commit_or_branch=${commit_hash:-${branch}}
 
 # Check that the commit branch actually *exists* on the remote first:
 if ! git branch --remotes --contains "${commit_or_branch}" 2>/dev/null |
-  grep -q "\<${remote}\>/"
-then
+    grep -q "\<${remote}\>/"; then
     echo "Commit not yet pushed to remote '${remote}'"
     exit 1
 fi
@@ -251,7 +250,7 @@ url=$(get_uri | sed 's://*:/:g')
 # a URL pattern we can use to construct a URL
 # For GitHub, for example, a URL pattern could be set using:
 # $ git config --local git-extras.browse-url-pattern "https://github.com/tj/git-extras/blob/{commit_or_branch}/{filename}#L{line1}-L{line2}"
-config_pattern(){
+config_pattern() {
     git config --local --get git-extras.browse-url-pattern-"$1"
 }
 # remote_custom(){
