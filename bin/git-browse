@@ -108,7 +108,7 @@ remote_gitit() {
     line=$(get_lines) # Leave this as is
     url_repository=https://${domain}/${repo}
     url_branches=''
-    url_branch=''
+    url_branch=$url_repository
     url_commit=''
     url_compare="${url_repository}/_diff/${filename%.page}?from=${commit_hash}&to=${compare_hash}"
     url_fileInBranch="${url_repository}/${filename%.page}?revision=${commit_hash}"
