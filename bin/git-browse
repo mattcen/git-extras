@@ -123,6 +123,8 @@ branch=""
 filename=${2:-""}
 line1=${3:-""}
 line2=${4:-""}
+compare_hash=''
+notation=..
 
 # get remote name
 if [[ -z $remote ]]; then
@@ -170,9 +172,6 @@ fi
 if [[ -n $filename ]]; then
     filename=$(git ls-files --full-name "${filename}")
 fi
-
-compare_hash=''
-notation=..
 
 if [[ $remote_url =~ gitlab ]]; then
     remote_gitlab
