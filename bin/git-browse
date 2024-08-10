@@ -151,7 +151,7 @@ elif [[ $remote_url = http* ]]; then
 elif [[ $remote_url =~ .*:.[^/].* ]]; then
     url=$(echo "$remote_url" | sed -E -e 's/:/\//' -e 's/\.git$//' -e 's/(.*@)?(.*)/\2/' -e 's://*:/:g')
 fi
-IFS=/ read -r domain repoBase repoPath <<<"${url}"
+IFS=/ read -r domain repoBase repoPath <<<"${url#*://}"
 
 # construct urls
 # If "HEAD" was the best abbreviated ref we could find, we don't have a branch/tag name
